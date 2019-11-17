@@ -190,12 +190,11 @@ def main(n, custom, random_start, neighbourhood, export, base):
         print(str(i)+": start point:" + "[x:" + str(new[i][0]) + " y:" + str(new[i][1]) + "] "+str((Z.count(new[i][2])*100)/(n*n)) + "%")
     image = image.reshape((n, n))
     plt.matshow(image)
-    plt.show()
-    plt.matshow(image)
     if export == "png":
         plt.savefig('output.png')
     elif export == "pdf":
         plt.savefig('output.pdf')
+    plt.show()
     return(image)
 
 
