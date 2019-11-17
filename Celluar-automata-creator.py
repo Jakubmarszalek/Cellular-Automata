@@ -93,13 +93,13 @@ def gui_function():
     btn = Button(window, text="Add data", command=lambda: clicked(n, neighbourhood, r, output_file, custom_x, custom_y))
     btn.grid(column=0, row=5)
 
-    x = "image.png" #openfn()
-    img = Image.open(x)
-    img = img.resize((250, 250), Image.ANTIALIAS)
-    img = ImageTk.PhotoImage(img)
-    panel = Label(window, image=img)
-    panel.image = img
-    panel.grid(column=0, row =6)
+    #x = "image.png" #openfn()
+    #img = Image.open(x)
+    #img = img.resize((250, 250), Image.ANTIALIAS)
+    #img = ImageTk.PhotoImage(img)
+    #panel = Label(window, image=img)
+    #panel.image = img
+    #panel.grid(column=0, row =6)
     window.mainloop()
 
 
