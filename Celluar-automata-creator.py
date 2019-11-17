@@ -8,6 +8,7 @@ import argparse
 from ast import literal_eval
 from tkinter import *
 from tkinter.ttk import *
+from PIL import ImageTk, Image
 base = 2
 
 
@@ -91,6 +92,14 @@ def gui_function():
 
     btn = Button(window, text="Add data", command=lambda: clicked(n, neighbourhood, r, output_file, custom_x, custom_y))
     btn.grid(column=0, row=5)
+
+    x = "image.png" #openfn()
+    img = Image.open(x)
+    img = img.resize((250, 250), Image.ANTIALIAS)
+    img = ImageTk.PhotoImage(img)
+    panel = Label(window, image=img)
+    panel.image = img
+    panel.grid(column=0, row =6)
     window.mainloop()
 
 
@@ -149,7 +158,7 @@ def main(n, custom, random_start, neighbourhood, export, base):
         for y in range(0, n):
             board[x].append(base)
     p = base + 1
-#    custom = literal_eval(custom)
+    #custom = literal_eval(custom)
     for i in custom:
         try:
             board[custom[i][0]][custom[i][1]] = p
@@ -180,6 +189,13 @@ def main(n, custom, random_start, neighbourhood, export, base):
             Z.extend(j)
         board = one_grow(board, base, n, check_new, neighbourhood)
         print(str(100 - Z.count(base)*100/(n*n))[0:5]+"%")
+        image = np.zeros(len(Z))
+        for i in range(len(image)):
+            image[i] = Z[i]
+        image = image.reshape((n, n))
+        plt.matshow(image)
+        plt.savefig('png_file/output{0}.png'.format(p))
+        plt.close()
         if not base in Z:
             break
     print("Proces end after {0} iteration".format(p))
