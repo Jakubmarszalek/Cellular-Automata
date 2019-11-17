@@ -25,7 +25,7 @@ def clicked(n, neighbourhood, r, output_file, custom_x, custom_y):
         size = 200
 
     if r.get() != "":
-        random = int(n.get())
+        random = int(r.get())
     else:
         random = 25
 
