@@ -5,32 +5,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 import argparse
+import io
 from ast import literal_eval
 from tkinter import *
 from tkinter.ttk import *
 from PIL import ImageTk, Image
+import tkinter
 base = 2
+stop_point = base - 1
 
 
-def clicked(n, neighbourhood, r, output_file, custom_x, custom_y):
-    custom = dict()
-    custom_x = custom_x.get().split(" ")
-    custom_y = custom_y.get().split(" ")
-    if custom_x != [""]:
-        for i in range(len(custom_x)):
-            custom.update({"custom{0}".format(i+1): [int(custom_x[i]), int(custom_y[i])]})
-
-    if n.get() != "":
-        size = int(n.get())
-    else:
-        size = 200
-
-    if r.get() != "":
-        random = int(r.get())
-    else:
-        random = 25
-
-    image = main(size, custom, random, neighbourhood.get(), output_file.get(), base)
+def draw(board):
+    for i in board:
+        print(i)
 
 
 def parse_arguments():
@@ -50,10 +37,140 @@ def parse_arguments():
 
 
 def gui_function():
-    window = Tk()
+    def main(n, custom, random_start, neighbourhood, export, base, inclusion_number, radius_min, radius_max):
+        new = {}
+        check_new = []
+        Z = list()
+        board = []
 
+        for x in range(0, n):
+            board.append([])
+            for y in range(0, n):
+                board[x].append(base)
+        p = base + 1
+        for i in custom:
+            try:
+                board[custom[i][0]][custom[i][1]] = p
+                custom[i].append(p)
+            except IndexError:
+                print("Custom start point not in declare box value")
+                sys.exit(1)
+            new.update({i: [custom[i][0], custom[i][1], p]})
+            p = p + 1
+
+        inclusion_point = []
+        while inclusion_number != 0:
+            y = random.randint(0, n - 1)
+            x = random.randint(0, n - 1)
+            if [y, x] not in inclusion_point:
+                try:
+                    radius = random.randint(radius_min, radius_max)
+                except ValueError:
+                    radius = random.randint(radius_max, radius_min)
+                create_inclusions(board, [y, x], radius)
+                inclusion_point.append([y, x])
+                inclusion_number = inclusion_number - 1
+
+        for i in range(p, p + random_start):
+            while 1:
+                x = random.randint(0, n - 1)
+                y = random.randint(0, n - 1)
+                if board[x][y] == base:  # not in new:
+                    board[x][y] = i
+                    break
+            new.update({"random{0}".format(i): [x, y, i]})
+
+        for i in new:
+            check_new.append(new[i][2])
+
+        p = 0
+        old_count = 0
+        while 1:
+            p = p + 1
+            Z.clear()
+            for j in board:
+                Z.extend(j)
+            board = one_grow(board, base, n, check_new, neighbourhood)
+            new_count = Z.count(base)
+            if new_count == old_count:
+                print("Part of image blocking by inculsion")
+                break
+            old_count = new_count
+            print(str(100 - new_count * 100 / (n * n))[0:5] + "%")
+            image = np.zeros(len(Z))
+            for i in range(len(image)):
+                image[i] = Z[i]
+            image = image.reshape((n, n))
+            plt.matshow(image)
+            #plt.savefig('png_file/output{0}.jpg'.format(p))
+            callback(p, plt)
+            plt.close()
+            if not base in Z:
+                break
+        print("Proces end after {0} iteration".format(p))
+        image = np.zeros(len(Z))
+        for i in range(len(image)):
+            image[i] = Z[i]
+        for i in new:
+            print(str(i) + ": start point:" + "[x:" + str(new[i][0]) + " y:" + str(new[i][1]) + "] " + str(
+                (Z.count(new[i][2]) * 100) / (n * n)) + "%")
+        image = image.reshape((n, n))
+        plt.matshow(image)
+        if export == "png":
+            plt.savefig('output.png')
+        elif export == "pdf":
+            plt.savefig('output.pdf')
+        plt.show()
+        return (image)
+    def clicked(n, neighbourhood, r, output_file, custom_x, custom_y, inclusion_number, radius_min, radius_max):
+        custom = dict()
+        custom_x = custom_x.get().split(" ")
+        custom_y = custom_y.get().split(" ")
+        if custom_x != [""]:
+            for i in range(len(custom_x)):
+                custom.update({"custom{0}".format(i + 1): [int(custom_x[i]), int(custom_y[i])]})
+
+        if n.get() != "":
+            size = int(n.get())
+        else:
+            size = 200
+
+        if r.get() != "":
+            random = int(r.get())
+        else:
+            random = 25
+
+        if inclusion_number.get() != "":
+            inclusion_number = int(inclusion_number.get())
+        else:
+            inclusion_number = 5
+
+        if radius_min.get() != "":
+            radius_min = int(radius_min.get())
+        else:
+            radius_min = 1
+
+        if radius_max.get() != "":
+            radius_max = int(radius_max.get())
+        else:
+            radius_max = 4
+        image = main(size, custom, random, neighbourhood.get(), output_file.get(), base, inclusion_number, radius_min,
+                     radius_max)
+
+    def callback(x, plt):
+       buf = io.BytesIO()
+       plt.savefig(buf, format='png')
+       buf.seek(0)
+       img = Image.open(buf)
+       img = img.resize((400, 400), Image.ANTIALIAS)
+       img = ImageTk.PhotoImage(img)
+       panel = Label(window, image=img)
+       panel.image = img
+       panel.grid(column=0, row=7)
+
+    window = Tk()
     window.title("Welcome to LikeGeeks app")
-    window.geometry('450x150')
+    window.geometry('680x560')
 
     lbl = Label(window, text="the size of the square")
     lbl.grid(column=0, row=0)
@@ -70,6 +187,9 @@ def gui_function():
     lbl = Label(window, text="parametr of custom start point: X and Y")
     lbl.grid(column=0, row=4)
 
+    lbl = Label(window, text="Number of random inclusions point and radius min-max")
+    lbl.grid(column=0, row=5)
+
     n = Entry(window, width=10)
     n.grid(column=1, row=0)
 
@@ -82,6 +202,15 @@ def gui_function():
     custom_y = Entry(window, width=10)
     custom_y.grid(column=2, row=4)
 
+    inclusion_number = Entry(window, width=10)
+    inclusion_number.grid(column=1, row=5)
+
+    radius_min = Entry(window, width=10)
+    radius_min.grid(column=2, row=5)
+
+    radius_max = Entry(window, width=10)
+    radius_max.grid(column=3, row=5)
+
     neighbourhood = Combobox(window)
     neighbourhood['values'] = ("von Neumanna", "Moore’a")
     neighbourhood.grid(column=1, row=1)
@@ -90,17 +219,12 @@ def gui_function():
     output_file['values'] = ("non output file", "pdf", "png")
     output_file.grid(column=1, row=3)
 
-    btn = Button(window, text="Add data", command=lambda: clicked(n, neighbourhood, r, output_file, custom_x, custom_y))
-    btn.grid(column=0, row=5)
+    btn = Button(window, text="Add data", command=lambda: clicked(n, neighbourhood, r, output_file, custom_x, custom_y, inclusion_number, radius_max, radius_min))
+    btn.grid(column=0, row=6)
 
-    #x = "image.png" #openfn()
-    #img = Image.open(x)
-    #img = img.resize((250, 250), Image.ANTIALIAS)
-    #img = ImageTk.PhotoImage(img)
-    #panel = Label(window, image=img)
-    #panel.image = img
-    #panel.grid(column=0, row =6)
+
     window.mainloop()
+
 
 
 def value_decide(list_value):
@@ -118,12 +242,55 @@ def value_decide(list_value):
     return random.choice(result)
 
 
+def create_stop_line(board, one, two):
+    board[one[0]][one[1]] = stop_point
+    board[two[0]][two[1]] = stop_point
+    x = one[1]
+    y = one[0]
+    while x != two[1]:
+        if two[1] > one[1]:
+            x = x + 1
+        else:
+            x = x - 1
+        board[y][x] = stop_point
+    while y != two[0]:
+        if two[0] > one[0]:
+            y = y + 1
+        else:
+            y = y - 1
+        board[y][x] = stop_point
+    return board
+
+
+def create_inclusions(board, point, radius):
+    for i in range(radius):
+        try:
+            create_stop_line(board, [point[0] - i, point[1]], [point[0], point[1] + i])
+        except IndexError:
+            pass
+
+        try:
+            create_stop_line(board, [point[0] - i, point[1]], [point[0], point[1] - i])
+        except IndexError:
+            pass
+
+        try:
+            create_stop_line(board, [point[0] + i, point[1]], [point[0], point[1] + i])
+        except IndexError:
+            pass
+
+        try:
+            create_stop_line(board, [point[0] + i, point[1]], [point[0], point[1] - i])
+        except IndexError:
+            pass
+
+
 def one_grow(board, base, n, check_new, neighbourhood):
     board2 = copy.deepcopy(board)
     new_value = list()
     for i in range(n):
         for j in range(n):
-            if board[i][j] not in check_new:
+            if board[i][j] not in check_new and board[i][j] != stop_point:
                 if i != (n-1) and board[i+1][j] != base:
                     new_value.append(board[i+1][j])
                 if j != (n-1) and board[i][j+1] != base:
@@ -141,81 +308,16 @@ def one_grow(board, base, n, check_new, neighbourhood):
                         new_value.append(board[i-1][j + 1])
                     if i != 0 and j != 0 and board[i - 1][j-1] != base:
                         new_value.append(board[i - 1][j-1])
+                while new_value.count(stop_point):
+                    new_value.remove(stop_point)
+
                 if len(new_value) != 0:
-                    board2[i][j] = value_decide(new_value)
+                    decided_value = value_decide(new_value)
+                    if decided_value != stop_point:
+                        board2[i][j] = decided_value
                 new_value.clear()
     return board2
 
-
-def main(n, custom, random_start, neighbourhood, export, base):
-    new = {}
-    check_new = []
-    Z = list()
-    board = []
-
-    for x in range(0, n):
-        board.append([])
-        for y in range(0, n):
-            board[x].append(base)
-    p = base + 1
-    #custom = literal_eval(custom)
-    for i in custom:
-        try:
-            board[custom[i][0]][custom[i][1]] = p
-            custom[i].append(p)
-        except IndexError:
-            print("Custom start point not in declare box value")
-            sys.exit(1)
-        new.update({i: [custom[i][0], custom[i][1], p]})
-        p = p + 1
-
-    for i in range(p, p + random_start):
-        while 1:
-            x = random.randint(0, n - 1)
-            y = random.randint(0, n - 1)
-            if board[x][y] not in new:
-                board[x][y] = i
-                break
-        new.update({"random{0}".format(i): [x, y, i]})
-
-    for i in new:
-        check_new.append(new[i][2])
-
-    p = 0
-    while 1:
-        p = p + 1
-        Z.clear()
-        for j in board:
-            Z.extend(j)
-        board = one_grow(board, base, n, check_new, neighbourhood)
-        print(str(100 - Z.count(base)*100/(n*n))[0:5]+"%")
-        image = np.zeros(len(Z))
-        for i in range(len(image)):
-            image[i] = Z[i]
-        image = image.reshape((n, n))
-        plt.matshow(image)
-        plt.savefig('png_file/output{0}.png'.format(p))
-        plt.close()
-        if not base in Z:
-            break
-    print("Proces end after {0} iteration".format(p))
-    image = np.zeros(len(Z))
-    for i in range(len(image)):
-        image[i] = Z[i]
-    for i in new:
-        print(str(i)+": start point:" + "[x:" + str(new[i][0]) + " y:" + str(new[i][1]) + "] "+str((Z.count(new[i][2])*100)/(n*n)) + "%")
-    image = image.reshape((n, n))
-    plt.matshow(image)
-    if export == "png":
-        plt.savefig('output.png')
-    elif export == "pdf":
-        plt.savefig('output.pdf')
-    plt.show()
-    return(image)
-
-
-
 if __name__ == '__main__':
     args = parse_arguments()
-    #main(args.n, args.custom, args.random, args.Neighbourhood, args.export, base)
     gui_function()
