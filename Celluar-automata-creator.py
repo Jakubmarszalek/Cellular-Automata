@@ -4,56 +4,26 @@ import matplotlib.pyplot as plt
 import numpy as np
 import argparse
 import io
+import copy
 from tkinter import *
 from tkinter.ttk import *
 from PIL import ImageTk, Image
+
+board = []
 base = 2
 stop_point = base - 1
-
-
-def draw(board):
-    for i in board:
-        print(i)
-
-
-def parse_arguments():
-    """
-    Parses commandline arguments
-    :return: Parsed arguments
-    """
-    parser = argparse.ArgumentParser('Run behave in parallel mode for scenarios')
-    parser.add_argument('--n', '-n', type=int, help='the size of the square. Default = 100', default=200)
-    parser.add_argument('--custom', '-c', help='Custom value. format: {"custom1": [x_int, y_int], "cystom2": [x_int, y_int]}', default={})
-    parser.add_argument('--random', '-r', type=int, help='Number of random start point, default 10', default=25)
-    parser.add_argument('--Neighbourhood', '-Neighbourhood', type=int, help='Type of Neighbourhood: 1)von Neumanna 2)Moore’a', default=1)
-    parser.add_argument('--export', '-export', type=str, help='Type of export picture format', default="")
-
-    args = parser.parse_args()
-    return args
+new_parametrs = dict()
 
 
 def gui_function():
-    def main(n, custom, random_start, neighbourhood, export, base, inclusion_number, radius_min, radius_max, proc):
+    def main(n, random_start, neighbourhood, export, base, inclusion_number, radius_min, radius_max, proc, DP_structure, DP_removal):
+        global board
         new = {}
         check_new = []
         Z = list()
-        board = []
-
-        for x in range(0, n):
-            board.append([])
-            for y in range(0, n):
-                board[x].append(base)
+        delete = []
+        sets = []
         p = base + 1
-        for i in custom:
-            try:
-                board[custom[i][0]][custom[i][1]] = p
-                custom[i].append(p)
-            except IndexError:
-                print("Custom start point not in declare box value")
-                sys.exit(1)
-            new.update({i: [custom[i][0], custom[i][1], p]})
-            p = p + 1
-
         inclusion_point = []
         while inclusion_number != 0:
             y = random.randint(0, n - 1)
@@ -67,8 +37,22 @@ def gui_function():
                 inclusion_point.append([y, x])
                 inclusion_number = inclusion_number - 1
 
+        if DP_structure != "yes":
+            board = new_board(n, base)
+        else:
+
+            for i in board:
+                sets = sets + list(set(i))
+                sets = list(set(sets))
+            for i in sets:
+                if random.randint(0, 100) < int(DP_removal):
+                    delete = delete + [i]
+            board = clean_board(board, delete, base)
+
         for i in range(p, p + random_start):
             while 1:
+                while i in sets:
+                    i = i + random_start
                 x = random.randint(0, n - 1)
                 y = random.randint(0, n - 1)
                 if board[x][y] == base:
@@ -78,18 +62,20 @@ def gui_function():
 
         for i in new:
             check_new.append(new[i][2])
-
+        for i in sets:
+            check_new.append(i)
         p = 0
         old_count = 0
+
         while 1:
             p = p + 1
             Z.clear()
             for j in board:
                 Z.extend(j)
             if neighbourhood == "Grain_Curvature":
-                board = grain_curvature(board, base, n, check_new, int(proc))
+                board = grain_curvature(board, base, check_new, int(proc), stop_point, sets)
             else:
-                board = one_grow(board, base, n, check_new, neighbourhood)
+                board = one_grow(board, base, check_new, neighbourhood, stop_point, sets)
             new_count = Z.count(base)
             if new_count == old_count:
                 print("Part of image blocking by inculsion")
@@ -118,132 +104,116 @@ def gui_function():
             plt.savefig('output.png')
         elif export == "pdf":
             plt.savefig('output.pdf')
+        return (plt)
+
+    def new_board(n, base):
+        board = []
+        for x in range(0, n):
+            board.append([])
+            for y in range(0, n):
+                board[x].append(base)
+        return board
+
+    def clean_board(board, delete, base):
+        n = len(board)
+        for x in range(0, n):
+            for y in range(0, n):
+                if board[x][y] in delete:
+                    board[x][y] = base
+        return board
+
+    def clicked(paremetrs):
+        global new_parametrs
+        if len(new_parametrs) != 0:
+            paremetrs = new_parametrs
+        for i in paremetrs:
+            try:
+                if paremetrs[i]["value"].get() != "":
+                    try:
+                        paremetrs[i]["value"] = int(paremetrs[i]["value"].get())
+                    except:
+                        paremetrs[i]["value"] = paremetrs[i]["value"].get()
+                else:
+                    paremetrs[i]["value"] = paremetrs[i]["defult"]
+            except:
+                pass
+        plt = main(paremetrs['size']["value"], paremetrs["number_start_place"]["value"],  paremetrs["neighbourhood"]["value"], paremetrs["output_file"]["value"], base, paremetrs["inclusion_number"]["value"], paremetrs["inclusion_min"]["value"],
+                     paremetrs["inclusion_max"]["value"], paremetrs["proc_grain"]["value"], paremetrs["DP_structure"]["value"], paremetrs["%_removal"]["value"])
+
+        new_parametrs = paremetrs_creator()
         plt.show()
-        return (image)
-
-    def clicked(n, neighbourhood, r, output_file, custom_x, custom_y, inclusion_number, radius_min, radius_max, proc):
-        custom = dict()
-        custom_x = custom_x.get().split(" ")
-        custom_y = custom_y.get().split(" ")
-        if custom_x != [""]:
-            for i in range(len(custom_x)):
-                custom.update({"custom{0}".format(i + 1): [int(custom_x[i]), int(custom_y[i])]})
-
-        if n.get() != "":
-            size = int(n.get())
-        else:
-            size = 200
-
-        if r.get() != "":
-            random = int(r.get())
-        else:
-            random = 25
-
-        if inclusion_number.get() != "":
-            inclusion_number = int(inclusion_number.get())
-        else:
-            inclusion_number = 5
-
-        if radius_min.get() != "":
-            radius_min = int(radius_min.get())
-        else:
-            radius_min = 1
-
-        if radius_max.get() != "":
-            radius_max = int(radius_max.get())
-        else:
-            radius_max = 4
-
-        if proc.get() != "":
-            proc = int(proc.get())
-        else:
-            proc = 40
-        image = main(size, custom, random, neighbourhood.get(), output_file.get(), base, inclusion_number, radius_min,
-                     radius_max, proc)
 
     def callback(proc_end, plt):
-       buf = io.BytesIO()
-       plt.savefig(buf, format='png')
-       buf.seek(0)
-       img = Image.open(buf)
-       img = img.resize((500, 500), Image.ANTIALIAS)
-       img = ImageTk.PhotoImage(img)
-       panel = Label(window, image=img)
-       panel.image = img
-       panel.grid(column=0, row=9)
-       panel2 = Label(window, text=proc_end)
-       panel2.grid(column=2, row=9)
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png')
+        buf.seek(0)
+        img = Image.open(buf)
+        img = img.resize((500, 500), Image.ANTIALIAS)
+        img = ImageTk.PhotoImage(img)
+        panel = Label(window, image=img)
+        panel.image = img
+        panel.grid(column=0, row=11)
+        panel2 = Label(window, text=proc_end)
+        panel2.grid(column=2, row=11)
 
     window = Tk()
-    window.title("Welcome to LikeGeeks app")
-    window.geometry('780x660')
+    window.title("Welcome to Multiscale modeling app")
+    window.geometry('800x720')
 
-    lbl = Label(window, text="the size of the square")
-    lbl.grid(column=0, row=0)
+    def paremetrs_creator():
+        paremetrs = dict()
+        paremetrs["size"] = {"value": Entry(window, width=10), "defult": 200, "name": "the size of the square"}
 
-    lbl = Label(window, text="type of Neighbourhood")
-    lbl.grid(column=0, row=1)
+        paremetrs["neighbourhood"] = {"value": Combobox(window), "defult": "von Neumanna", "name": "type of Neighbourhood"}
+        paremetrs["neighbourhood"]["value"]["values"] = ("von Neumanna", "Moore’a", "Grain_Curvature")
 
-    lbl = Label(window, text="% for Grain_Curvature")
-    lbl.grid(column=0, row=2)
+        paremetrs["proc_grain"] = {"value": Entry(window, width=10), "defult": 40, "name": "% for Grain_Curvature"}
 
-    lbl = Label(window, text="Number of random start place")
-    lbl.grid(column=0, row=3)
+        paremetrs["number_start_place"] = {"value": Entry(window, width=10), "defult": 25, "name": "Number of random start place"}
 
-    lbl = Label(window, text="Type of output file")
-    lbl.grid(column=0, row=4)
+        paremetrs["output_file"] = {"value": Combobox(window), "defult": "non output file", "name": "Type of output file"}
+        paremetrs["output_file"]["value"]["values"] = ("non output file", "pdf", "png")
 
-    lbl = Label(window, text="parametr of custom start point: X and Y")
-    lbl.grid(column=0, row=5)
+        paremetrs["inclusion_number"] = {"value": Entry(window, width=10), "defult": 5, "name": "Number of random inclusions point"}
 
-    lbl = Label(window, text="Number of random inclusions point and radius min-max")
-    lbl.grid(column=0, row=6)
+        paremetrs["inclusion_min"] = {"value": Entry(window, width=10), "defult": 1, "name": "minimal radius of inclusions"}
 
-    n = Entry(window, width=10)
-    n.grid(column=1, row=0)
+        paremetrs["inclusion_max"] = {"value": Entry(window, width=10), "defult": 5, "name": "maximal radius of inclusions"}
 
-    proc = Entry(window, width=10)
-    proc.grid(column=1, row=2)
+        paremetrs["DP_structure"] = {"value": Combobox(window), "defult": "no",
+                                    "name": "DP_structure?"}
+        paremetrs["DP_structure"]["value"]["values"] = ("yes", "no")
 
-    r = Entry(window, width=10)
-    r.grid(column=1, row=3)
+        paremetrs["%_removal"] = {"value": Entry(window, width=10), "defult": 80,
+                                      "name": "DP Structure: % of Removal grains"}
+        j = 0
+        for i in paremetrs:
+            Label(window, text=paremetrs[i]["name"]).grid(column=0, row=j)
+            paremetrs[i]["value"].grid(column=1, row=j)
+            j += 1
+        return paremetrs
 
-    custom_x = Entry(window, width=10)
-    custom_x.grid(column=1, row=5)
-
-    custom_y = Entry(window, width=10)
-    custom_y.grid(column=2, row=5)
-
-    inclusion_number = Entry(window, width=10)
-    inclusion_number.grid(column=1, row=6)
-
-    radius_min = Entry(window, width=10)
-    radius_min.grid(column=2, row=6)
-
-    radius_max = Entry(window, width=10)
-    radius_max.grid(column=3, row=6)
-
-    neighbourhood = Combobox(window)
-    neighbourhood['values'] = ("von Neumanna", "Moore’a", "Grain_Curvature")
-    neighbourhood.grid(column=1, row=1)
-
-    output_file = Combobox(window)
-    output_file['values'] = ("non output file", "pdf", "png")
-    output_file.grid(column=1, row=4)
-
-    btn = Button(window, text="Add data", command=lambda: clicked(n, neighbourhood, r, output_file, custom_x, custom_y, inclusion_number, radius_max, radius_min, proc))
-    btn.grid(column=0, row=8)
-
+    paremetrs = paremetrs_creator()
+    btn = Button(window, text="Add data", command=lambda: clicked(paremetrs))
+    btn.grid(column=0, row=10)
     window.mainloop()
 
 
-def value_decide(list_value):
+def value_decide(list_value, list_delete):
+    new_value = copy.deepcopy(list_value)
+    for i in list_value:
+        if i in list_delete:
+            new_value.remove(i)
+    list_value = new_value
     value_set = set(list_value)
     value_dict = dict()
     result = list()
     for i in value_set:
         value_dict.update({i: list_value.count(i)})
-    value_max = max(value_dict.values())
+    try:
+        value_max = max(value_dict.values())
+    except:
+        return stop_point
     for i in value_dict:
         if value_dict[i] == value_max:
             result.append(i)
@@ -295,7 +265,8 @@ def create_inclusions(board, point, radius):
             pass
 
 
-def one_grow(board, base, n, check_new, neighbourhood):
+def one_grow(board, base, check_new, neighbourhood, stop_point, list_delete):
+    n = len(board)
     board2 = copy.deepcopy(board)
     new_value = list()
     for i in range(n):
@@ -322,14 +293,15 @@ def one_grow(board, base, n, check_new, neighbourhood):
                     new_value.remove(stop_point)
 
                 if len(new_value) != 0:
-                    decided_value = value_decide(new_value)
+                    decided_value = value_decide(new_value, list_delete)
                     if decided_value != stop_point:
                         board2[i][j] = decided_value
                 new_value.clear()
     return board2
 
 
-def grain_curvature(board, base, n, check_new, chance):
+def grain_curvature(board, base, check_new, chance, stop_point, list_delete):
+    n = len(board)
     board2 = copy.deepcopy(board)
     rule2_list = list()
     rule3_list = list()
@@ -366,7 +338,7 @@ def grain_curvature(board, base, n, check_new, chance):
                         if rule3_list.count(k) >= 3:
                             board2[i][j] = k
                 if len(rule2_list + rule3_list) != 0:
-                    decided_value = value_decide(rule2_list + rule3_list)
+                    decided_value = value_decide(rule2_list + rule3_list, list_delete)
                     if decided_value != stop_point:
                         if random.randint(0, 100) <= chance:
                             board2[i][j] = decided_value
@@ -374,7 +346,5 @@ def grain_curvature(board, base, n, check_new, chance):
                 rule3_list.clear()
     return board2
 
-
 if __name__ == '__main__':
-    args = parse_arguments()
     gui_function()
